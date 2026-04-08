@@ -133,7 +133,7 @@ class DailyCollectionView(generics.ListAPIView):
 
 # ─── Missing Households ──────────────────────────────────────
 class MissingHouseholdsView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAdminOrManager]
 
     def get(self, request):
         project_id  = request.query_params.get('project')
@@ -182,7 +182,7 @@ class MissingHouseholdsView(APIView):
 
 # ─── Daily Dashboard ─────────────────────────────────────────
 class DailyDashboardView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAdminOrManager]
 
     def get(self, request):
         project_id  = request.query_params.get('project')
@@ -238,7 +238,7 @@ class DailyDashboardView(APIView):
 
 # ─── Weekly Dashboard ────────────────────────────────────────
 class WeeklyDashboardView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAdminOrManager]
 
     def get(self, request):
         project_id = request.query_params.get('project')

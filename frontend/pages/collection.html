@@ -114,6 +114,7 @@
 </head>
 
 <body>
+    <div class="bg-animation"></div>
 
     <div class="navbar">
         <h1>♻️ Waste Entry</h1>
@@ -143,6 +144,7 @@
             <h2>🏠 House Number</h2>
             <input type="text" id="house-id-input" class="house-input-big" placeholder="e.g. S123" autocomplete="off"
                 autocorrect="off" autocapitalize="characters">
+                <div id="house-error" style="color:#c62828;font-size:13px;margin-top:4px;display:none;"></div>
             <p style="text-align:center;font-size:12px;color:#9e9e9e;margin-top:8px;">
                 Type the number from the household/bucket
             </p>
@@ -172,16 +174,10 @@
         <button class="submit-big" id="submit-btn" onclick="submitEntry()">
             ✅ SUBMIT
         </button>
+        <button class="btn btn-primary" onclick="confirmDownload()">
+            📥 Download Today's Data
+        </button>
 
-        <!-- Recent entries today -->
-        <div class="card" style="margin-top:16px;">
-            <h2>📋 Today's Entries <span id="entry-count" style="font-size:13px;color:#9e9e9e;"></span></h2>
-            <div class="recent-list" id="recent-entries">
-                <p style="color:#9e9e9e;font-size:14px;text-align:center;padding:16px;">
-                    No entries yet today
-                </p>
-            </div>
-        </div>
     </div>
 
     <nav class="bottom-nav">
@@ -196,125 +192,219 @@
         </a>
     </nav>
 
-    <script src="../js/api.js"></script>
-    <script>
-        if (!getToken()) window.location.href = 'login.html';
+<script src="../js/api.js"></script>
+<script>
+    // 🔐 Auth check
+    const user = getUser();
+    if (!getToken() || !user) {
+        window.location.href = 'login.html';
+    }
 
-        let selectedWasteTypes = [];
-        let recentEntries = [];
+    // 🎨 Background function (ADDED)
+    function createBackground(theme = 'green') {
+        const container = document.querySelector('.bg-animation');
+        if (!container) return;
 
-        document.getElementById('entry-date').value = new Date().toISOString().split('T')[0];
+        const icons = ['♻️', '🗑️', '🌱', '🌍', '💚', '🏠', '⚠️'];
 
-        // Load projects on page load
-        async function loadProjects() {
+        const colors = {
+            green: '#2e7d32',
+            orange: '#f57c00'
+        };
+
+        for (let i = 0; i < 20; i++) {
+            const span = document.createElement('span');
+            span.innerText = icons[Math.floor(Math.random() * icons.length)];
+
+            span.style.left = Math.random() * 100 + 'vw';
+            span.style.animationDuration = (8 + Math.random() * 5) + 's';
+            span.style.fontSize = (18 + Math.random() * 20) + 'px';
+            span.style.color = colors[theme];
+
+            container.appendChild(span);
+        }
+    }
+
+    let selectedWasteTypes = [];
+    let recentEntries = [];
+
+    document.getElementById('entry-date').value =
+        new Date().toISOString().split('T')[0];
+
+    // Load projects
+    async function loadProjects() {
+        try {
             const projects = await getProjects();
             const sel = document.getElementById('project-select');
+
+            // ✅ FIX: reset dropdown
+            sel.innerHTML = '<option value="">-- Select Project --</option>';
+
             projects.forEach(p => {
                 sel.innerHTML += `<option value="${p.id}">${p.name}</option>`;
             });
-            // Auto select first project
+
             if (projects.length === 1) {
                 sel.value = projects[0].id;
             }
+        } catch (err) {
+            console.error(err);
+            alert("Failed to load projects");
         }
+    }
 
-        function toggleWaste(btn, type) {
-            btn.classList.toggle('selected');
-            if (btn.classList.contains('selected')) {
-                selectedWasteTypes.push(type);
-            } else {
-                selectedWasteTypes = selectedWasteTypes.filter(t => t !== type);
-            }
+    function toggleWaste(btn, type) {
+        btn.classList.toggle('selected');
+        if (btn.classList.contains('selected')) {
+            selectedWasteTypes.push(type);
+        } else {
+            selectedWasteTypes = selectedWasteTypes.filter(t => t !== type);
         }
+    }
 
-        function showAlert(msg, type = 'info') {
-            const box = document.getElementById('alert-box');
-            box.innerHTML = `<div class="alert alert-${type}">${msg}</div>`;
-            setTimeout(() => box.innerHTML = '', 3000);
-        }
+    function showAlert(msg, type = 'info') {
+        const box = document.getElementById('alert-box');
+        box.innerHTML = `<div class="alert alert-${type}">${msg}</div>`;
+        setTimeout(() => box.innerHTML = '', 3000);
+    }
 
-        function resetForm() {
-            document.getElementById('house-id-input').value = '';
-            selectedWasteTypes = [];
-            document.querySelectorAll('.waste-btn').forEach(b => b.classList.remove('selected'));
-            document.getElementById('house-id-input').focus();
-        }
+    function resetForm() {
+        const input = document.getElementById('house-id-input');
 
-        function addToRecentList(houseId, wasteTypes) {
-            const now = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
-            recentEntries.unshift({ houseId, wasteTypes, time: now });
-            if (recentEntries.length > 20) recentEntries.pop();
+        input.value = '';
+        selectedWasteTypes = [];
 
-            document.getElementById('entry-count').textContent =
-                `(${recentEntries.length} today)`;
-
-            document.getElementById('recent-entries').innerHTML = recentEntries.map(e => `
-            <div style="display:flex;justify-content:space-between;
-                        align-items:center;padding:10px 0;
-                        border-bottom:1px solid #f0f0f0;">
-                <div>
-                    <span style="font-weight:700;color:#1b5e20;font-size:16px;">
-                        ${e.houseId}
-                    </span>
-                    <span style="font-size:12px;color:#9e9e9e;margin-left:8px;">
-                        ${e.time}
-                    </span>
-                    <div style="font-size:12px;color:#555;margin-top:2px;">
-                        ${e.wasteTypes.join(', ')}
-                    </div>
-                </div>
-                <span style="color:#2e7d32;font-size:18px;">✅</span>
-            </div>
-        `).join('');
-        }
-
-        async function submitEntry() {
-            const projectId = document.getElementById('project-select').value;
-            const houseId = document.getElementById('house-id-input').value.trim().toUpperCase();
-            const entryDate = document.getElementById('entry-date').value;
-            const btn = document.getElementById('submit-btn');
-
-            if (!projectId) return showAlert('Please select a project.', 'error');
-            if (!houseId) return showAlert('Please enter the house number.', 'error');
-            if (!selectedWasteTypes.length) return showAlert('Please select waste type.', 'error');
-
-            btn.disabled = true;
-            btn.textContent = 'Saving...';
-
-            try {
-                const res = await apiFetch('/collections/', {
-                    method: 'POST',
-                    body: JSON.stringify({
-                        project: projectId,
-                        house_id: houseId,
-                        date: entryDate,
-                        waste_types: selectedWasteTypes,
-                    }),
-                });
-
-                showAlert(`✅ ${res.message}`, 'success');
-                addToRecentList(houseId, selectedWasteTypes);
-                resetForm();
-
-            } catch (err) {
-                if (err.duplicate) {
-                    showAlert(`⚠️ House ${houseId} already submitted today!`, 'warning');
-                } else {
-                    showAlert(`❌ ${err.error || 'Something went wrong.'}`, 'error');
-                }
-            } finally {
-                btn.disabled = false;
-                btn.textContent = '✅ SUBMIT';
-            }
-        }
-
-        // Allow Enter key to submit
-        document.getElementById('house-id-input').addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') submitEntry();
+        document.querySelectorAll('.waste-btn').forEach(b => {
+            b.classList.remove('selected');
         });
 
-        loadProjects();
-    </script>
-</body>
+        input.focus();
+
+        input.style.border = '2px solid #2e7d32';
+        input.style.boxShadow = '0 0 8px #2e7d32';
+
+        setTimeout(() => {
+            input.style.border = '';
+            input.style.boxShadow = '';
+        }, 500);
+    }
+
+    async function submitEntry() {
+        const projectId = document.getElementById('project-select').value;
+        const houseId = document.getElementById('house-id-input').value.trim().toUpperCase();
+        const entryDate = document.getElementById('entry-date').value;
+        const btn = document.getElementById('submit-btn');
+
+        if (!projectId) return showAlert('Please select a project.', 'error');
+        if (!houseId) return showAlert('Please enter the house number.', 'error');
+        if (!selectedWasteTypes.length) return showAlert('Please select waste type.', 'error');
+
+        btn.disabled = true;
+        btn.textContent = 'Saving...'; // ✅ FIX
+
+        try {
+            const res = await apiFetch('/collections/', {
+                method: 'POST',
+                body: JSON.stringify({
+                    project: projectId,
+                    house_id: houseId,
+                    date: entryDate,
+                    waste_types: selectedWasteTypes,
+                }),
+            });
+
+            showAlert(`✅ Saved: ${houseId}`, 'success');
+            resetForm();
+            document.getElementById('house-error').style.display = 'none';
+
+            // ✅ AFTER success
+            btn.textContent = '✅ Saved!';
+            setTimeout(() => {
+                btn.textContent = '✅ SUBMIT';
+            }, 800);
+
+        } catch (err) {
+            const input = document.getElementById('house-id-input');
+            const errorBox = document.getElementById('house-error');
+
+            let message = "Something went wrong";
+
+            if (err.detail) message = err.detail;
+            else if (err.error) message = err.error;
+            else if (err.duplicate) message = `House ${houseId} already submitted today!`;
+
+            errorBox.innerText = message;
+            errorBox.style.display = 'block';
+
+            input.classList.add('input-error');
+            setTimeout(() => input.classList.remove('input-error'), 400);
+
+        } finally {
+            btn.disabled = false;
+        }
+    }
+
+    function confirmDownload() {
+        if (confirm("Are you sure you want to download today's data?")) {
+            downloadTodayData();
+        }
+    }
+
+    async function downloadTodayData() {
+        const projectId = document.getElementById('project-select').value;
+        const date = document.getElementById('entry-date').value;
+
+        if (!projectId) return alert("Please select a project first.");
+
+        try {
+            const data = await getDailyCollections(projectId, date);
+
+            if (!data.length) return alert("No data available for today.");
+
+            let csv = "S.No,Date,HH Number,Waste Type,Entered By\n";
+
+            data.forEach((item, index) => {
+                const wasteTypes = item.waste_types.join('|');
+                const enteredBy = item.collected_by_name || 'Unknown';
+                const houseId = item.house_id || item.household?.house_id;
+
+                csv += `${index + 1},${item.date},${houseId},${wasteTypes},${enteredBy}\n`;
+            });
+
+            downloadCSV(csv, `collected_${date}.csv`);
+
+        } catch (err) {
+            alert("Failed to download data.");
+            console.error(err);
+        }
+    }
+
+    function downloadCSV(csvContent, filename) {
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = window.URL.createObjectURL(blob);
+
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+
+        window.URL.revokeObjectURL(url);
+    }
+
+    document.getElementById('house-id-input').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') submitEntry();
+    });
+
+    document.getElementById('house-id-input').addEventListener('input', () => {
+        document.getElementById('house-error').style.display = 'none';
+    });
+
+    // 🚀 INIT
+    createBackground('green');
+    loadProjects();
+</script></body>
 
 </html>

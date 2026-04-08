@@ -36,9 +36,19 @@ class HouseholdSimpleSerializer(serializers.ModelSerializer):
 
 
 class WasteCollectionSerializer(serializers.ModelSerializer):
+    # ✅ NEW FIELDS (IMPORTANT)
+    collected_by_name = serializers.CharField(
+        source='collected_by.username',
+        read_only=True
+    )
+    house_id = serializers.CharField(
+        source='household.house_id',
+        read_only=True
+    )
+
     class Meta:
         model = WasteCollection
-        fields = '__all__'
+        fields = '__all__'  # keeps all existing + adds above fields
         read_only_fields = ['collected_by', 'created_at']
 
     def validate(self, data):
@@ -64,8 +74,6 @@ class WasteCollectionSerializer(serializers.ModelSerializer):
                 f"Invalid waste type. Choose from: {valid}"
             )
         return value
-
-
 class MissedCollectionSerializer(serializers.ModelSerializer):
     house_id = serializers.CharField(source='household.house_id', read_only=True)
     owner_name = serializers.CharField(source='household.owner_name', read_only=True)

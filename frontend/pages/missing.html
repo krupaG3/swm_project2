@@ -9,6 +9,7 @@
 </head>
 
 <body>
+    <div class="bg-animation"></div>
 
     <div class="navbar">
         <h1>⚠️ Missing Households</h1>
@@ -51,71 +52,165 @@
         </a>
     </nav>
 
-    <script src="../js/api.js"></script>
-    <script>
-        if (!getToken()) window.location.href = 'login.html';
+<script src="../js/api.js"></script>
+<script>
+    // 🔐 Auth + Role check
+    const user = getUser();
 
-        document.getElementById('missing-date').value = new Date().toISOString().split('T')[0];
+    if (!getToken() || !user) {
+        window.location.href = 'login.html';
+    } else if (user.role === 'field_worker') {
+        alert("Access denied. Only managers can view this page.");
+        window.location.href = 'collection.html';
+    }
 
-        async function loadProjects() {
+    // 🎨 Background function (ADDED safely)
+    function createBackground(theme = 'green') {
+        const container = document.querySelector('.bg-animation');
+        if (!container) return;
+
+        const icons = ['♻️', '🗑️', '🌱', '🌍', '💚', '🏠', '⚠️'];
+
+        const colors = {
+            green: '#2e7d32',
+            orange: '#f57c00'
+        };
+
+        for (let i = 0; i < 20; i++) {
+            const span = document.createElement('span');
+            span.innerText = icons[Math.floor(Math.random() * icons.length)];
+
+            span.style.left = Math.random() * 100 + 'vw';
+            span.style.animationDuration = (8 + Math.random() * 5) + 's';
+            span.style.fontSize = (18 + Math.random() * 20) + 'px';
+            span.style.color = colors[theme];
+
+            container.appendChild(span);
+        }
+    }
+
+    // 📅 Set date
+    document.getElementById('missing-date').value =
+        new Date().toISOString().split('T')[0];
+
+    // 📦 Load projects
+    async function loadProjects() {
+        try {
             const projects = await getProjects();
             const sel = document.getElementById('project-select');
+
+            sel.innerHTML = '<option value="">-- Select Project --</option>';
+
             projects.forEach(p => {
                 sel.innerHTML += `<option value="${p.id}">${p.name}</option>`;
             });
+
+        } catch (err) {
+            console.error("Error loading projects:", err);
+            alert("Failed to load projects");
         }
+    }
 
-        async function loadMissing() {
-            const projectId = document.getElementById('project-select').value;
-            const date = document.getElementById('missing-date').value;
-            if (!projectId) return;
+    async function loadMissing() {
+        const projectId = document.getElementById('project-select').value;
+        const date = document.getElementById('missing-date').value;
+        if (!projectId) return;
 
+        document.getElementById('missing-content').innerHTML =
+            '<div class="loading"><div class="spinner"></div><p>Loading...</p></div>';
+
+        try {
+            const data = await getMissingHouseholds(projectId, date);
+            renderMissing(data);
+        } catch (e) {
             document.getElementById('missing-content').innerHTML =
-                '<div class="loading"><div class="spinner"></div><p>Loading...</p></div>';
-
-            try {
-                const data = await getMissingHouseholds(projectId, date);
-                renderMissing(data);
-            } catch (e) {
-                document.getElementById('missing-content').innerHTML =
-                    '<div class="alert alert-error">Failed to load data.</div>';
-            }
+                '<div class="alert alert-error">Failed to load data.</div>';
         }
+    }
 
-        function renderMissing(data) {
-            const color = data.missing_count === 0 ? 'success' : 'warning';
-            const icon = data.missing_count === 0 ? '✅' : '⚠️';
+    function renderMissing(data) {
+        const hasMissing = data.missing_count > 0;
 
-            let listHtml = '';
-            if (data.missing_households.length === 0) {
-                listHtml = '<div class="alert alert-success">All households have submitted waste today! 🎉</div>';
-            } else {
-                listHtml = data.missing_households.map(h => `
-                <div class="house-item">
-                    <div>
-                        <div class="house-id">${h.house_id}</div>
-                        <div class="house-info">
-                            ${h.owner_name || 'No name'} · ${h.address || 'No address'}
-                        </div>
-                    </div>
-                    <span class="badge badge-warning">Missing</span>
+        document.getElementById('missing-content').innerHTML = `
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="value">${data.total_master}</div>
+                <div class="label">Master List</div>
+            </div>
+            <div class="stat-card">
+                <div class="value">${data.collected_today}</div>
+                <div class="label">Collected</div>
+            </div>
+            <div class="stat-card">
+                <div class="value" style="color:#c62828;">
+                    ${data.missing_count}
                 </div>
-            `).join('');
+                <div class="label">Missing</div>
+            </div>
+        </div>
+
+        ${hasMissing
+                ? `<button class="btn btn-primary" onclick="confirmMissingDownload()">
+                   📥 Download Missing List
+               </button>`
+                : `<div class="alert alert-success">
+                   ✅ No missing households for this date
+               </div>`
+            }
+        `;
+    }
+
+    function confirmMissingDownload() {
+        const confirmAction = confirm("Download missing households list?");
+        if (confirmAction) {
+            downloadMissingCSV();
+        }
+    }
+
+    async function downloadMissingCSV() {
+        const projectId = document.getElementById('project-select').value;
+        const date = document.getElementById('missing-date').value;
+
+        try {
+            const data = await getMissingHouseholds(projectId, date);
+
+            if (!data.missing_households.length) {
+                return alert("No missing data to download.");
             }
 
-            document.getElementById('missing-content').innerHTML = `
-            <div class="alert alert-${color}">
-                ${icon} <strong>${data.missing_count} households</strong> missing on ${data.date}
-            </div>
-            <div class="card">
-                <h2>Missing List</h2>
-                ${listHtml}
-            </div>
-        `;
-        }
+            let csv = "S.No,Date,HH Number,Driver Name,Area Name,Sub Route\n";
 
-        loadProjects();
-    </script>
+            data.missing_households.forEach((h, index) => {
+                csv += `${index + 1},${date},${h.house_id},${h.driver_name || ''},${h.area_name || ''},${h.sub_route || ''}\n`;
+            });
+
+            downloadCSV(csv, `missing_${date}.csv`);
+
+        } catch (err) {
+            alert("Failed to download missing data.");
+            console.error(err);
+        }
+    }
+
+    function downloadCSV(csvContent, filename) {
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = window.URL.createObjectURL(blob);
+
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+
+        window.URL.revokeObjectURL(url);
+    }
+
+    // 🚀 INIT
+    createBackground('orange');
+    loadProjects();
+</script>
 </body>
 
 </html>
