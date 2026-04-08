@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SWM — Missing Households</title>
+    <link rel="stylesheet" href="../css/style.css">
+</head>
+
+<body>
+
+    <div class="navbar">
+        <h1>⚠️ Missing Households</h1>
+        <button class="logout-btn" onclick="logout()">Logout</button>
+    </div>
+
+    <div class="container page-content">
+
+        <div class="card" style="padding:14px;">
+            <div style="display:flex;gap:10px;align-items:center;">
+                <select id="project-select"
+                    style="flex:1;padding:10px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:15px;"
+                    onchange="loadMissing()">
+                    <option value="">-- Select Project --</option>
+                </select>
+                <input type="date" id="missing-date"
+                    style="padding:10px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:15px;"
+                    onchange="loadMissing()">
+            </div>
+        </div>
+
+        <div id="missing-content">
+            <div class="loading">
+                <div class="spinner"></div>
+                <p>Select a project to view missing households</p>
+            </div>
+        </div>
+
+    </div>
+
+    <nav class="bottom-nav">
+        <a href="collection.html">
+            <span class="nav-icon">📝</span>Entry
+        </a>
+        <a href="missing.html" class="active">
+            <span class="nav-icon">⚠️</span>Missing
+        </a>
+        <a href="dashboard.html">
+            <span class="nav-icon">📊</span>Dashboard
+        </a>
+    </nav>
+
+    <script src="../js/api.js"></script>
+    <script>
+        if (!getToken()) window.location.href = 'login.html';
+
+        document.getElementById('missing-date').value = new Date().toISOString().split('T')[0];
+
+        async function loadProjects() {
+            const projects = await getProjects();
+            const sel = document.getElementById('project-select');
+            projects.forEach(p => {
+                sel.innerHTML += `<option value="${p.id}">${p.name}</option>`;
+            });
+        }
+
+        async function loadMissing() {
+            const projectId = document.getElementById('project-select').value;
+            const date = document.getElementById('missing-date').value;
+            if (!projectId) return;
+
+            document.getElementById('missing-content').innerHTML =
+                '<div class="loading"><div class="spinner"></div><p>Loading...</p></div>';
+
+            try {
+                const data = await getMissingHouseholds(projectId, date);
+                renderMissing(data);
+            } catch (e) {
+                document.getElementById('missing-content').innerHTML =
+                    '<div class="alert alert-error">Failed to load data.</div>';
+            }
+        }
+
+        function renderMissing(data) {
+            const color = data.missing_count === 0 ? 'success' : 'warning';
+            const icon = data.missing_count === 0 ? '✅' : '⚠️';
+
+            let listHtml = '';
+            if (data.missing_households.length === 0) {
+                listHtml = '<div class="alert alert-success">All households have submitted waste today! 🎉</div>';
+            } else {
+                listHtml = data.missing_households.map(h => `
+                <div class="house-item">
+                    <div>
+                        <div class="house-id">${h.house_id}</div>
+                        <div class="house-info">
+                            ${h.owner_name || 'No name'} · ${h.address || 'No address'}
+                        </div>
+                    </div>
+                    <span class="badge badge-warning">Missing</span>
+                </div>
+            `).join('');
+            }
+
+            document.getElementById('missing-content').innerHTML = `
+            <div class="alert alert-${color}">
+                ${icon} <strong>${data.missing_count} households</strong> missing on ${data.date}
+            </div>
+            <div class="card">
+                <h2>Missing List</h2>
+                ${listHtml}
+            </div>
+        `;
+        }
+
+        loadProjects();
+    </script>
+</body>
+
+</html>

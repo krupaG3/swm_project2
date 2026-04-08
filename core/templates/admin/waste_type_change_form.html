@@ -1,0 +1,52 @@
+{% extends "admin/change_form.html" %}
+
+{% block field_sets %}
+{{ block.super }}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // Find the waste_types field and replace with checkboxes
+        const wasteChoices = {{ waste_choices| safe
+    }};
+    const current = {{ current_waste_types| safe }};
+
+    // Find the textarea/input for waste_types
+    const field = document.querySelector('#id_waste_types');
+    if (!field) return;
+
+    const wrapper = field.closest('.form-row') || field.parentElement;
+
+    // Build checkbox UI
+    const colors = {
+        dry: '#1565c0', wet: '#00695c',
+        mixed: '#e65100', hazardous: '#b71c1c', electric: '#6a1b9a'
+    };
+
+    const icons = {
+        dry: '🟦', wet: '🟩', mixed: '🟧',
+        hazardous: '🟥', electric: '🟪'
+    };
+
+    let html = '<div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:8px;">';
+    wasteChoices.forEach(function (choice) {
+        const checked = current.includes(choice) ? 'checked' : '';
+        const color = colors[choice] || '#333';
+        html += `
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;
+                          padding:8px 16px;border:2px solid ${color};border-radius:20px;
+                          font-weight:500;color:${color};">
+                <input type="checkbox"
+                       name="waste_types_select"
+                       value="${choice}"
+                       ${checked}
+                       style="width:16px;height:16px;accent-color:${color};">
+                ${icons[choice]} ${choice.charAt(0).toUpperCase() + choice.slice(1)}
+            </label>`;
+    });
+    html += '</div>';
+
+    // Hide original field, inject checkboxes
+    field.style.display = 'none';
+    field.insertAdjacentHTML('afterend', html);
+});
+</script>
+{% endblock %}
