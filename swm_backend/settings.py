@@ -58,11 +58,11 @@ WSGI_APPLICATION = 'swm_backend.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': config('DB_NAME'),
-        'USER': config('DB_USER'),
-        'PASSWORD': config('DB_PASSWORD'),
+        'NAME': config('swm_db'),
+        'USER': config('postgres'),
+        'PASSWORD': config('Krupa@143'),
         'HOST': config('DB_HOST'),
-        'PORT': config('DB_PORT'),
+        'PORT': config('5432'),
     }
 }
 
