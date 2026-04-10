@@ -60,8 +60,10 @@ class CollectionCreateView(APIView):
         entry_date  = request.data.get('date', str(date.today()))
         notes       = request.data.get('notes', '')
 
+        # ✅ Basic validations
         if not project_id:
             return Response({"error": "Project is required."}, status=400)
+
         if not house_id:
             return Response({"error": "House ID is required."}, status=400)
 
@@ -74,51 +76,58 @@ class CollectionCreateView(APIView):
         except Project.DoesNotExist:
             return Response({"error": "Project not found."}, status=404)
 
-        # Auto-create household if not exists
-        household, created = Household.objects.get_or_create(
-            house_id=house_id,
-            project=project,
-            defaults={'status': 'active'}
-        )
+        try:
+            # ✅ Auto-create household if not exists (NO CHANGE)
+            household, created = Household.objects.get_or_create(
+                house_id=house_id,
+                project=project,
+                defaults={'status': 'active'}
+            )
 
-        # Check duplicate
-        if WasteCollection.objects.filter(household=household, date=entry_date).exists():
+            # ✅ Check duplicate (NO CHANGE)
+            if WasteCollection.objects.filter(household=household, date=entry_date).exists():
+                return Response({
+                    "error": f"House {house_id} already submitted today.",
+                    "duplicate": True
+                }, status=400)
+
+            # ✅ Save entry (NO CHANGE)
+            WasteCollection.objects.create(
+                household=household,
+                project=project,
+                date=entry_date,
+                waste_types=waste_types,
+                collected_by=request.user,
+                notes=notes,
+            )
+
+            # ✅ Update household (NO CHANGE)
+            Household.objects.filter(id=household.id).update(
+                last_collection_date=entry_date,
+                status='active'
+            )
+
+            # ✅ Cache clear (NO CHANGE)
+            cache.delete(f"dashboard:daily:{project_id}:{entry_date}")
+            cache.delete(f"missing:{project_id}:{entry_date}")
+            cache.delete(f"dashboard:weekly:{project_id}")
+
             return Response({
-                "error": f"House {house_id} already submitted today.",
-                "duplicate": True
-            }, status=400)
+                "success":          True,
+                "message":          f"House {house_id} entry saved!",
+                "house_id":         house_id,
+                "entered_by":       request.user.username,
+                "is_new_household": created,
+                "waste_types":      waste_types,
+                "date":             entry_date,
+            }, status=201)
 
-        # Save entry
-        WasteCollection.objects.create(
-            household=household,
-            project=project,
-            date=entry_date,
-            waste_types=waste_types,
-            collected_by=request.user,
-            notes=notes,
-        )
-
-        # Update household last collection date
-        Household.objects.filter(id=household.id).update(
-            last_collection_date=entry_date,
-            status='active'
-        )
-
-        # Bust cache
-        cache.delete(f"dashboard:daily:{project_id}:{entry_date}")
-        cache.delete(f"missing:{project_id}:{entry_date}")
-        cache.delete(f"dashboard:weekly:{project_id}")
-
-        return Response({
-            "success":          True,
-            "message":          f"House {house_id} entry saved!",
-            "house_id":         house_id,
-            "entered_by":       request.user.username,
-            "is_new_household": created,
-            "waste_types":      waste_types,
-            "date":             entry_date,
-        }, status=201)
-
+        except Exception as e:
+            # ✅ SAFE ERROR HANDLING (NEW — DOES NOT BREAK ANYTHING)
+            return Response({
+                "error": "Something went wrong while saving entry.",
+                "details": str(e)
+            }, status=500)
 
 class DailyCollectionView(generics.ListAPIView):
     serializer_class   = WasteCollectionSerializer
