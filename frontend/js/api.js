@@ -1,5 +1,4 @@
-const API_BASE = 'http://127.0.0.1:8000/api';
-
+const API_BASE = 'https://swm-project2.onrender.com/api';
 // ── Token helpers ──────────────────────────────
 function getToken() {
     return localStorage.getItem('access_token');
@@ -12,7 +11,7 @@ function getUser() {
 
 function logout() {
     localStorage.clear();
-    window.location.href = '/frontend/pages/login.html';
+    window.location.href = 'pages/login.html';
 }
 
 // ── Core fetch wrapper ─────────────────────────
