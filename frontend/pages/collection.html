@@ -237,22 +237,35 @@
             const projects = await getProjects();
             const sel = document.getElementById('project-select');
 
-            // ✅ FIX: reset dropdown
+            // Preserve selected value (if any)
+            const selectedValue = sel.value;
+
+            // Reset dropdown
             sel.innerHTML = '<option value="">-- Select Project --</option>';
 
             projects.forEach(p => {
-                sel.innerHTML += `<option value="${p.id}">${p.name}</option>`;
+                const option = document.createElement('option');
+                option.value = p.id;
+                option.textContent = p.name;
+
+                // Restore selected value
+                if (p.id == selectedValue) {
+                    option.selected = true;
+                }
+
+                sel.appendChild(option);
             });
 
+            // Auto select if only one project
             if (projects.length === 1) {
                 sel.value = projects[0].id;
             }
+
         } catch (err) {
             console.error(err);
             alert("Failed to load projects");
         }
     }
-
     function toggleWaste(btn, type) {
         btn.classList.toggle('selected');
         if (btn.classList.contains('selected')) {
@@ -299,11 +312,12 @@
         if (!houseId) return showAlert('Please enter the house number.', 'error');
         if (!selectedWasteTypes.length) return showAlert('Please select waste type.', 'error');
 
+        // ✅ Set loading state
         btn.disabled = true;
-        btn.textContent = 'Saving...'; // ✅ FIX
+        btn.textContent = 'Saving...';
 
         try {
-            const res = await apiFetch('/collections/', {
+            await apiFetch('/collections/', {
                 method: 'POST',
                 body: JSON.stringify({
                     project: projectId,
@@ -313,11 +327,12 @@
                 }),
             });
 
+            // ✅ SUCCESS
             showAlert(`✅ Saved: ${houseId}`, 'success');
             resetForm();
+
             document.getElementById('house-error').style.display = 'none';
 
-            // ✅ AFTER success
             btn.textContent = '✅ Saved!';
             setTimeout(() => {
                 btn.textContent = '✅ SUBMIT';
@@ -333,17 +348,21 @@
             else if (err.error) message = err.error;
             else if (err.duplicate) message = `House ${houseId} already submitted today!`;
 
+            // ❌ Show inline error
             errorBox.innerText = message;
             errorBox.style.display = 'block';
 
+            // 🔥 FORCE SHAKE (FIXED)
+            input.classList.remove('input-error'); // reset first
+            void input.offsetWidth; // force reflow
             input.classList.add('input-error');
-            setTimeout(() => input.classList.remove('input-error'), 400);
 
         } finally {
+            // ✅ ALWAYS RESET BUTTON (FIXED)
             btn.disabled = false;
+            btn.textContent = '✅ SUBMIT';
         }
     }
-
     function confirmDownload() {
         if (confirm("Are you sure you want to download today's data?")) {
             downloadTodayData();
@@ -352,7 +371,12 @@
 
     async function downloadTodayData() {
         const projectId = document.getElementById('project-select').value;
-        const date = document.getElementById('entry-date').value;
+        let date = document.getElementById('entry-date').value;
+
+        // ✅ fallback to today if empty
+        if (!date) {
+            date = new Date().toISOString().split('T')[0];
+        }
 
         if (!projectId) return alert("Please select a project first.");
 

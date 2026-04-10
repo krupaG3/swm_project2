@@ -526,3 +526,32 @@ body {
     backdrop-filter: blur(10px);
     border-radius: 14px;
 }
+select {
+    width: 100%;
+    padding: 12px 14px;
+    border: 2px solid #e0e0e0;
+    border-radius: 10px;
+    font-size: 15px;
+    background-color: white;
+    color: #333;
+
+    /* 🔥 Important fixes */
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+
+    /* Add dropdown arrow */
+    background-image: url("data:image/svg+xml;utf8,<svg fill='%232e7d32' height='20' viewBox='0 0 24 24' width='20' xmlns='http://www.w3.org/2000/svg'><path d='M7 10l5 5 5-5z'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    background-size: 18px;
+}
+
+select:focus {
+    border-color: #2e7d32;
+    outline: none;
+    box-shadow: 0 0 6px rgba(46, 125, 50, 0.3);
+}
+select:hover {
+    border-color: #2e7d32;
+}

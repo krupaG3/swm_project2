@@ -100,11 +100,23 @@
             const projects = await getProjects();
             const sel = document.getElementById('project-select');
 
-            // ✅ FIX: reset dropdown
+            // Preserve selected value
+            const selectedValue = sel.value;
+
+            // Reset dropdown
             sel.innerHTML = '<option value="">-- Select Project --</option>';
 
             projects.forEach(p => {
-                sel.innerHTML += `<option value="${p.id}">${p.name}</option>`;
+                const option = document.createElement('option');
+                option.value = p.id;
+                option.textContent = p.name;
+
+                // Restore selected value
+                if (p.id == selectedValue) {
+                    option.selected = true;
+                }
+
+                sel.appendChild(option);
             });
 
         } catch (err) {
@@ -112,7 +124,6 @@
             alert("Failed to load projects");
         }
     }
-
     async function loadDashboard() {
         const projectId = document.getElementById('project-select').value;
         const date = document.getElementById('dash-date').value;
