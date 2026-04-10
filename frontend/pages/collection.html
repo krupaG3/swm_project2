@@ -323,7 +323,7 @@
                     project: projectId,
                     house_id: houseId,
                     date: entryDate,
-                    waste_types: selectedWasteTypes,
+                    waste_types: selectedWasteTypes.map(t => t.toLowerCase()),
                 }),
             });
 
@@ -342,7 +342,7 @@
             const input = document.getElementById('house-id-input');
             const errorBox = document.getElementById('house-error');
 
-            let message = "Something went wrong";
+           let message = err.detail || JSON.stringify(err) || "Something went wrong";
 
             if (err.detail) message = err.detail;
             else if (err.error) message = err.error;
