@@ -7,6 +7,7 @@ from django.core.cache import cache
 from datetime import date, timedelta
 from collections import defaultdict
 import json
+from .models import MasterHousehold
 
 from .models import (
     Project, Route, Household, WasteCollection,
@@ -77,12 +78,25 @@ class CollectionCreateView(APIView):
             return Response({"error": "Project not found."}, status=404)
 
         try:
-            # ✅ Auto-create household if not exists (NO CHANGE)
+            # 🔥 FIX START — validate from MasterHousehold
+            try:
+                master = MasterHousehold.objects.get(
+                    house_id__iexact=house_id,
+                    project=project,
+                    is_active=True
+                )
+            except MasterHousehold.DoesNotExist:
+                return Response({
+                    "error": f"House {house_id} not found in master list."
+                }, status=400)
+
+            # 🔥 Use exact DB value (fix case issues)
             household, created = Household.objects.get_or_create(
-                house_id=house_id,
+                house_id=master.house_id,
                 project=project,
                 defaults={'status': 'active'}
             )
+            # 🔥 FIX END
 
             # ✅ Check duplicate (NO CHANGE)
             if WasteCollection.objects.filter(household=household, date=entry_date).exists():
@@ -123,12 +137,11 @@ class CollectionCreateView(APIView):
             }, status=201)
 
         except Exception as e:
-            # ✅ SAFE ERROR HANDLING (NEW — DOES NOT BREAK ANYTHING)
+            # ✅ SAFE ERROR HANDLING (NO CHANGE)
             return Response({
                 "error": "Something went wrong while saving entry.",
                 "details": str(e)
             }, status=500)
-
 class DailyCollectionView(generics.ListAPIView):
     serializer_class   = WasteCollectionSerializer
     permission_classes = [IsAuthenticated]
